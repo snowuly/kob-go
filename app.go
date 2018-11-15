@@ -11,10 +11,15 @@ type App struct {
 	*koa.App
 }
 
+type FuncRenderF func(http.ResponseWriter, interface{}, ...string)
+type FuncRenderG func(http.ResponseWriter, interface{}, string)
+
 type Key int
 
 const (
 	KeyParams = Key(iota)
+	KeyRenderF
+	KeyRenderG
 )
 
 func NewApp() *App {
@@ -59,4 +64,34 @@ func compose(fns []koa.Handler) func(context.Context) {
 		list.Run(ctx)
 	}
 
+}
+
+func (app *App) Listen(addr string, ctx context.Context) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx = context.WithValue(ctx, KeyRenderF, FuncRenderF(renderFiles))
+	ctx = context.WithValue(ctx, KeyRenderG, FuncRenderG(renderGlob))
+	app.App.Listen(addr, ctx)
+}
+
+func renderFiles(w http.ResponseWriter, data interface{}, files ...string) {
+	tpl, err := GetTpl(files...)
+	if err != nil {
+		panic(err)
+	}
+	err = tpl.Execute(w, data)
+	if err != nil {
+		panic(err)
+	}
+}
+func renderGlob(w http.ResponseWriter, data interface{}, pattern string) {
+	tpl, err := GetTplGlob(pattern)
+	if err != nil {
+		panic(err)
+	}
+	err = tpl.Execute(w, data)
+	if err != nil {
+		panic(err)
+	}
 }
