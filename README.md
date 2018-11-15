@@ -1,4 +1,4 @@
 # kob-go
 
 - add Router
-- add View Template
+- add View Template (WIP)

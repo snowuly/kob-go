@@ -12,11 +12,9 @@ func main() {
 
 	app := kob.NewApp()
 
-	app.Get("/tony", func(ctx context.Context, w http.ResponseWriter, r *http.Request, next func(context.Context)) {
-		w.Write([]byte("hello tont time to home"))
-	})
-	app.Get("/tonyx", func(ctx context.Context, w http.ResponseWriter, r *http.Request, next func(context.Context)) {
-		w.Write([]byte("hello tont time to homex"))
+	app.Get("/name/:name", func(ctx context.Context, w http.ResponseWriter, r *http.Request, next func(context.Context)) {
+		params := ctx.Value(kob.KeyParams).(map[string]string)
+		w.Write([]byte("hello " + params["name"]))
 	})
 
 	app.Listen(":8080")
