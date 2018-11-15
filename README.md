@@ -1,7 +1,7 @@
 # kob-go
 
 - add Router
-- add View Template (WIP)
+- add View Template
 
 ```go
 app := kob.NewApp()
