@@ -3,95 +3,76 @@ package kob
 import (
 	"context"
 	"net/http"
-
-	koa "github.com/snowuly/koa-go"
+	"regexp"
 )
+
+type NextFunc func(context.Context)
+type HandlerFunc func(context.Context, http.ResponseWriter, *http.Request, NextFunc)
+type EntryFunc func(context.Context, http.ResponseWriter, *http.Request)
+
+type Route struct {
+	Method string
+	Reg    *regexp.Regexp
+	keys   []string
+	Entry  EntryFunc
+}
+
+type key int
+
+const paramsKey key = 0
 
 type App struct {
-	*koa.App
+	Routes []*Route
 }
 
-type FuncRenderF func(http.ResponseWriter, interface{}, ...string)
-type FuncRenderG func(http.ResponseWriter, interface{}, string)
-
-type Key int
-
-const (
-	KeyParams = Key(iota)
-	KeyRenderF
-	KeyRenderG
-)
-
-func NewApp() *App {
-	return &App{koa.NewApp()}
+func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	for _, route := range app.Routes {
+		if r.Method == route.Method {
+			values := route.Reg.FindStringSubmatch(r.URL.Path)
+			if len(values) > 0 {
+				params := make(map[string]string)
+				for i, key := range route.keys {
+					params[key] = values[i+1]
+				}
+				ctx := context.WithValue(r.Context(), paramsKey, params)
+				route.Entry(ctx, w, r)
+				return
+			}
+		}
+	}
+	http.NotFound(w, r)
 }
 
-func (app *App) Route(method, path string, fns ...koa.Handler) koa.Handler {
+func (app *App) Route(method, path string, fns ...HandlerFunc) {
 	reg, keys, err := PathToReg(path)
 	if err != nil {
 		panic(err)
 	}
-	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, next func(context.Context)) {
-		if r.Method == method {
-			values := reg.FindStringSubmatch(r.URL.Path)
-			if len(values) > 0 {
-				params := make(map[string]string)
-				for i, key := range keys {
-					params[key] = values[i+1]
-				}
-				compose(fns)(context.WithValue(ctx, KeyParams, params))
-				return
-			}
-		}
-		if next != nil {
-			next(ctx)
-		} else {
-			http.NotFound(w, r)
-		}
-	}
+	app.Routes = append(app.Routes, &Route{method, reg, keys, compose(fns)})
 }
 
-func (app *App) Get(path string, fns ...koa.Handler) {
-	app.Use(app.Route("GET", path, fns...))
+func (app *App) Get(path string, fns ...HandlerFunc) {
+	app.Route("GET", path, fns...)
 }
 
-func compose(fns []koa.Handler) func(context.Context) {
-	return func(ctx context.Context) {
-		var list koa.List
-		for _, fn := range fns {
-			list.Add(fn)
-		}
-		list.Run(ctx)
+func (app *App) Listen(addr string) {
+	http.ListenAndServe(addr, app)
+}
+
+func GetParams(ctx context.Context) map[string]string {
+	if params, ok := ctx.Value(paramsKey).(map[string]string); ok {
+		return params
 	}
+	panic("params is not map[string]string")
 
 }
 
-func (app *App) Listen(addr string, ctx context.Context) {
-	if ctx == nil {
-		ctx = context.Background()
+func compose(fns []HandlerFunc) EntryFunc {
+	var list List
+	for _, fn := range fns {
+		list.Add(fn)
 	}
-	ctx = context.WithValue(ctx, KeyRenderF, FuncRenderF(renderFiles))
-	ctx = context.WithValue(ctx, KeyRenderG, FuncRenderG(renderGlob))
-	app.App.Listen(addr, ctx)
-}
-
-func renderFiles(w http.ResponseWriter, data interface{}, files ...string) {
-	tpl, err := GetTpl(files...)
-	if err != nil {
-		panic(err)
-	}
-	err = tpl.Execute(w, data)
-	if err != nil {
-		panic(err)
-	}
-}
-func renderGlob(w http.ResponseWriter, data interface{}, pattern string) {
-	tpl, err := GetTplGlob(pattern)
-	if err != nil {
-		panic(err)
-	}
-	err = tpl.Execute(w, data)
-	if err != nil {
-		panic(err)
+	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+		list.Run(ctx, w, r)
 	}
 }

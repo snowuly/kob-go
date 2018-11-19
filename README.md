@@ -1,16 +1,16 @@
 # kob-go
 
 - add Router
-- add View Template
 
 ```go
-app := kob.NewApp()
+	var app kob.App
 
-app.Get("/name/:name", func(ctx context.Context, w http.ResponseWriter, r *http.Request, next func(context.Context)) {
-	params := ctx.Value(kob.KeyParams).(map[string]string)
-	render := ctx.Value(kob.KeyRenderF).(kob.FuncRenderF)
-	render(w, params, "head")
-})
+	app.Get("/name/:name", func(ctx context.Context, w http.ResponseWriter, r *http.Request, next kob.NextFunc) {
 
-app.Listen(":8080", nil)
+		params := kob.GetParams(ctx)
+		w.Write([]byte("hello "))
+		w.Write([]byte(params["name"]))
+	})
+
+	app.Listen(":8080")
 ```
