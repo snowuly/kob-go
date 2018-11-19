@@ -19,7 +19,5 @@ app.Get(
 	},
 )
 
-	app.Listen(":8080")
-
 app.Listen(":8080")
 ```
