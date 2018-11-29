@@ -54,9 +54,15 @@ func (app *App) Route(method, path string, fns ...HandlerFunc) {
 func (app *App) Get(path string, fns ...HandlerFunc) {
 	app.Route("GET", path, fns...)
 }
+func (app *App) Post(path string, fns ...HandlerFunc) {
+	app.Route("POST", path, fns...)
+}
 
 func (app *App) Listen(addr string) {
 	http.ListenAndServe(addr, app)
+}
+func (app *App) ListenTLS(addr, cert, key string) {
+	http.ListenAndServeTLS(addr, cert, key, app)
 }
 
 func GetParams(ctx context.Context) map[string]string {
